@@ -1,11 +1,6 @@
 
 nextflow.enable.dsl = 2
 
-params.reference = ""
-params.subreads = ""
-params.aln_only = null
-
-
 def help_function() {
     help = """somatic_point_mutations.nf: somatic point mutation caller pipeline.
              |Required arguments:
@@ -44,10 +39,10 @@ process STRELKA_SOMATIC {
 
     publishDir "$params.outdir/strelka_somatic/${meta}", mode: "copy"
 
-    //conda "${baseDir}/strelka_env.yml"
-    //container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-     //   'https://depot.galaxyproject.org/singularity/strelka:2.9.10--h9ee0642_1' :
-       // 'biocontainers/strelka:2.9.10--h9ee0642_1' }"
+    conda "${baseDir}/strelka_env.yml"
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/strelka:2.9.10--h9ee0642_1' :
+        'biocontainers/strelka:2.9.10--h9ee0642_1' }"
 
     input:
     tuple val(meta), path(input_normal), path(input_index_normal), path(input_tumor), path(input_index_tumor),  path(manta_candidate_small_indels), path(manta_candidate_small_indels_tbi)
@@ -125,55 +120,6 @@ process STRELKA_SOMATIC {
     """
 }
 
-//we index and filter PASS variants 
-/*
-process BCFTOOLS_PASS_INDEX {
-    tag "$meta-bcf"
-    publishDir "$params.outdir/VCFsfiltered/${meta}", mode: "copy"
-
-    //conda "${moduleDir}/environment.yml"
-    //container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-    //   'https://depot.galaxyproject.org/singularity/bcftools:1.18--h8b25389_0':
-    //  'biocontainers/bcftools:1.18--h8b25389_0' }"
-
-    input:
-    tuple val(meta), path(vcf)
-
-    output:
-    tuple val(meta), path("*_PASS.vcf.gz"), path("*_PASS.vcf.gz.csi"), emit: csi
-    tuple val(meta), path("*.tbi"), optional:true, emit: tbi
-    path "versions.yml"           , emit: versions
-
-
-    script:
-    def args = task.ext.args ?: ''
-    def prefix = task.ext.prefix ?: "${meta}"
-    def file_tag = vcf[0].name.replace(".vcf.gz","").replace(".vcf","")
-   """
-   bcftools view -f PASS -O z ${vcf} -o ${file_tag}_PASS.vcf.gz
-   bcftools index -t ${file_tag}_PASS.vcf.gz
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        bcftools: \$(bcftools --version 2>&1 | head -n1 | sed 's/^.*bcftools //; s/ .*\$//')
-    END_VERSIONS
-   """
-    stub:
-    def args = task.ext.args ?: ''
-    def prefix = task.ext.prefix ?: "${meta}"
-    def file_tag = vcf[0].name.replace(".vcf.gz","").replace(".vcf","")
-   """
-   echo bcftools view -f PASS -O z ${vcf} -o ${file_tag}_PASS.vcf.gz
-   echo bcftools index -t ${file_tag}_PASS.vcf.gz
-   touch ${file_tag}_PASS.vcf.gz
-   touch ${file_tag}_PASS.vcf.gz.csi
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        bcftools: 1.2 
-    END_VERSIONS
-   """
-}*/
 
 
 
@@ -186,9 +132,7 @@ workflow {
      }
 
     if(params.tn  == null  || params.fasta == null || params.fai == null ){
-      //|| params.target_bed == null || params.target_bed_index == null){
         help_function()
-    
     }
      //we read the ref fasta file
       ch_ref_fasta = Channel.value(file( "${params.fasta}" ))
@@ -206,9 +150,6 @@ workflow {
     STRELKA_SOMATIC(pairs,ch_bed_target,ch_bed_target_index,ch_ref_fasta,ch_ref_fai)
     BFSNV(STRELKA_SOMATIC.out.vcf_snvs)
     BFINDEL(STRELKA_SOMATIC.out.vcf_indels)
-
-
-
 }
 
 
