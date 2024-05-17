@@ -3,12 +3,12 @@ call somatic point mutations from tumor/normal pairs
 
 ## nextflow 
 ```
-nextflow run main.nf --tn tn_pairs.csv --fasta ref.fa --fai ref.fa.fai  --exome true
+nextflow run somatic_point_mutations/main.nf --tn test.csv -params-file strelka-params.yml -profile kutral
 ```
 
 ### Tumor/Normal file
 
-CSV file indicating the paths to CRAM or BAM files, including index and alternative man_indel VCFs files.
+CSV file indicating the paths to CRAM or BAM files, including index and alternative manta_indel VCFs files.
 ```
 sampleId,normal,normal_index,tumor,tumor_index,manta_indel,manta_indel_index
 A,A.cram,A.cram.crai,AT.cram,AT.cram.crai,,
