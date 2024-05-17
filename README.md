@@ -3,7 +3,7 @@ call somatic point mutations from tumor/normal pairs
 
 ## nextflow 
 ```
-nextflow run somatic_point_mutations/main.nf --tn test.csv -params-file strelka-params.yml -profile kutral
+nextflow run digenoma-lab/somatic_point_mutations -r v1.0 --tn test.csv -params-file strelka-params.yml -profile kutral
 ```
 
 ### Tumor/Normal file
