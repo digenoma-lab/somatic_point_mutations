@@ -6,6 +6,8 @@ def help_function() {
              |Required arguments:
              |  --tn  tumor normal pairs
              |                [default: ${params.tn}]
+             |  --vcfs  VCFs of tumor normal pairs from streka 
+             |                [default: ${params.vcfs}]
              |  --fasta  reference file in fasta format
              |                [default: ${params.fasta}]
              |  --fai  reference index file in fai format
@@ -20,6 +22,15 @@ def help_function() {
              |                [default: ${params.target_bed}]
              |  --target_bed_index  bed index 
              |                [default: ${params.target_bed_index}]
+             |   Annovar options:
+             |  --annovar_bin   path to annovar_table.pl exec 
+             |              [default : ${params.annovar_bin}
+             | --annovar_bd  path to annovar database hg38
+             |               [default : ${params.annovar_bd}]
+             | --annovar_protocol databases included in annovar analysis
+             |              [default: ${params.annovar_protocol}]
+             | --annovar_operation operation according to annovar selected databases
+             |              [default: ${params.annovar_operations}]
              |                """.stripMargin()
     // Print the help with the stripped margin and exit
     println(help)
@@ -120,20 +131,50 @@ process STRELKA_SOMATIC {
     """
 }
 
+//we run ANNOVAR annotation tool
+process ANNOVAR{
+    tag "${meta}-AV"
+  publishDir "$params.outdir/annovar", mode: "copy"
 
+  input:
+    tuple val(meta), path(variants), path(vindex)
+  output:
+    tuple val (meta), path("*multianno.vcf"), path("*multianno.txt"), emit: annovar
+
+  script:
+   """
+    ${params.annovar_bin}/table_annovar.pl ${variants} \\
+    ${params.annovar_bd}/hg38 -out ${meta}_annovar_annot \\
+    -nastring . -vcfinput --buildver hg38  --codingarg -includesnp --remove --onetranscript \\
+    -protocol ${params.annovar_protocol} -operation ${params.annovar_operation} 
+    """
+  stub:
+    """
+   echo ${params.annovar_bin}/table_annovar.pl ${variants} \\
+        ${params.annovar_bd}/hg38 -out ${meta}_annovar \\
+    -nastring . -vcfinput --buildver hg38  --codingarg -includesnp --remove --onetranscript \\
+    -protocol ${params.annovar_protocol} -operation ${params.annovar_operation} 
+    touch ${meta}_annovar_multianno.vcf ${meta}_annovar_multianno.txt
+    """
+}
 
 
 include { BCFTOOLS_PASS_INDEX as BFSNV } from './modules/bcftools'
 include { BCFTOOLS_PASS_INDEX as BFINDEL } from './modules/bcftools'
+include { BCFTOOLS_CONCAT as BCON} from './modules/bcftools'
+
 
 workflow {
      if(params.help){
         help_function()
      }
 
-    if(params.tn  == null  || params.fasta == null || params.fai == null ){
+     //we do add the vcfs options to run annovar directly from unmerged strelka files
+    if( (params.tn  == null && params.vcfs  == null)  || params.fasta == null || params.fai == null ){
         help_function()
     }
+
+    if(params.tn!=null){
      //we read the ref fasta file
       ch_ref_fasta = Channel.value(file( "${params.fasta}" ))
       ch_ref_fai = Channel.value(file( "${params.fai}"))
@@ -147,9 +188,26 @@ workflow {
         | map { row-> tuple(row.sampleId, file(row.normal), file(row.normal_index), file(row.tumor),file(row.tumor_index), row.manta_indel ? file(row.manta_indel):[],row.manta_indel_index ? file(row.manta_indel_index):[])}
 
 //    pairs.view()
+//This part is for strelka somatic point mutation caller 
     STRELKA_SOMATIC(pairs,ch_bed_target,ch_bed_target_index,ch_ref_fasta,ch_ref_fai)
     BFSNV(STRELKA_SOMATIC.out.vcf_snvs)
+    snps=BFSNV.out.tbi
     BFINDEL(STRELKA_SOMATIC.out.vcf_indels)
+    indels=BFINDEL.out.tbi
+    pm_merge=snps.join(indels)
+    BCON(pm_merge)
+    //BCON.out.tbi.view()
+    ANNOVAR(BCON.out.tbi)  
+    //we do call annovar to run the annotation of point mutations
+  }else{
+    if(params.vcfs!=null){
+        vcfs=Channel.fromPath(params.vcfs) \
+        | splitCsv(header:true) \
+        | map { row-> tuple(row.sampleId, file(row.snpvcf), file(row.snpindex), file(row.indelvcf),file(row.indelindex))}
+        BCON(vcfs)
+        ANNOVAR(BCON.out.tbi)      
+    }
+  } 
 }
 
 
