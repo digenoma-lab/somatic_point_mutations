@@ -144,14 +144,14 @@ process ANNOVAR{
   script:
    """
     ${params.annovar_bin}/table_annovar.pl ${variants} \\
-    ${params.annovar_bd}/hg38 -out ${meta}_annovar_annot \\
+    ${params.annovar_bd}/hg38 -out ${meta}_annovar  --thread  $task.cpus \\
     -nastring . -vcfinput --buildver hg38  --codingarg -includesnp --remove --onetranscript \\
     -protocol ${params.annovar_protocol} -operation ${params.annovar_operation} 
     """
   stub:
     """
    echo ${params.annovar_bin}/table_annovar.pl ${variants} \\
-        ${params.annovar_bd}/hg38 -out ${meta}_annovar \\
+        ${params.annovar_bd}/hg38 -out ${meta}_annovar --thread  $task.cpus \\
     -nastring . -vcfinput --buildver hg38  --codingarg -includesnp --remove --onetranscript \\
     -protocol ${params.annovar_protocol} -operation ${params.annovar_operation} 
     touch ${meta}_annovar_multianno.vcf ${meta}_annovar_multianno.txt
