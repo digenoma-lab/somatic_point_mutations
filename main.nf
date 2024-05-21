@@ -30,7 +30,7 @@ def help_function() {
              | --annovar_protocol databases included in annovar analysis
              |              [default: ${params.annovar_protocol}]
              | --annovar_operation operation according to annovar selected databases
-             |              [default: ${params.annovar_operations}]
+             |              [default: ${params.annovar_operation}]
              |                """.stripMargin()
     // Print the help with the stripped margin and exit
     println(help)
@@ -94,6 +94,8 @@ process STRELKA_SOMATIC {
     mv strelka/results/variants/somatic.indels.vcf.gz.tbi ${prefix}.somatic_indels.vcf.gz.tbi
     mv strelka/results/variants/somatic.snvs.vcf.gz       ${prefix}.somatic_snvs.vcf.gz
     mv strelka/results/variants/somatic.snvs.vcf.gz.tbi   ${prefix}.somatic_snvs.vcf.gz.tbi
+    # we add the genotype information to strelka files
+    sh ${baseDir}/auxfiles/fixGT.sh *.vcf.gz 
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -143,15 +145,15 @@ process ANNOVAR{
 
   script:
    """
-    ${params.annovar_bin}/table_annovar.pl ${variants} \\
-    ${params.annovar_bd}/hg38 -out ${meta}_annovar  --thread  $task.cpus \\
+    ${params.annovar_bin} ${variants} \\
+    ${params.annovar_bd} -out ${meta}_annovar  --thread  $task.cpus \\
     -nastring . -vcfinput --buildver hg38  --codingarg -includesnp --remove --onetranscript \\
     -protocol ${params.annovar_protocol} -operation ${params.annovar_operation} 
     """
   stub:
     """
-   echo ${params.annovar_bin}/table_annovar.pl ${variants} \\
-        ${params.annovar_bd}/hg38 -out ${meta}_annovar --thread  $task.cpus \\
+   echo ${params.annovar_bin} ${variants} \\
+        ${params.annovar_bd} -out ${meta}_annovar --thread  $task.cpus \\
     -nastring . -vcfinput --buildver hg38  --codingarg -includesnp --remove --onetranscript \\
     -protocol ${params.annovar_protocol} -operation ${params.annovar_operation} 
     touch ${meta}_annovar_multianno.vcf ${meta}_annovar_multianno.txt
